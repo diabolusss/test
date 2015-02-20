@@ -1,0 +1,50 @@
+BEGIN
+
+  DECLARE iPoint      INT;
+  DECLARE vError      VARCHAR (200);
+  DECLARE vDebug      VARCHAR (100);
+
+
+  DECLARE EXIT HANDLER
+  FOR SQLEXCEPTION, SQLWARNING, NOT FOUND
+  BEGIN
+    ROLLBACK;
+    INSERT INTO `error_log` (`id`, `account_id`, `procedure`, `query`, `dump`, `timestamp`) VALUES (NULL, 0, 'auto_close_orders', vError, CONCAT_WS(',', dPrice, iPoint), NULL);
+    set vDebug = CONCAT("Error ID: ", (SELECT last_insert_id()));
+  END;
+
+  START TRANSACTION;
+
+  SET vDebug = "OK";
+  SET vError = "SELECT `point` FROM `config` WHERE `status` = 'active'";
+  SET iPoint = (
+    SELECT    `point`
+    FROM    `config`
+    WHERE    `status` = 'active');
+
+  SET vError = "CALL update_profit(dPrice)";
+  CALL update_profit(dPrice);
+
+  SET vError = "UPDATE `orders` SET `status` = 'closing' WHERE `status` = 'open' AND `type` = 'buy' AND (`take_profit` < dPrice OR `stop_loss` > dPrice)";
+  UPDATE    `orders`
+  SET    `status` = 'closing'
+  WHERE    `status` = 'open' AND `type` = 'buy'    AND (NOT (`take_profit` > dPrice) OR NOT (`stop_loss` < dPrice));
+
+  SET vError = "UPDATE `orders` SET `status` = 'closing' WHERE `status` = 'open' AND `type` = 'sell'   AND (`take_profit` > dPrice OR `stop_loss` < dPrice)";
+  UPDATE    `orders`
+  SET    `status` = 'closing'
+  WHERE    `status` = 'open' AND `type` = 'sell'    AND (NOT (`take_profit` < dPrice) OR NOT (`stop_loss` > dPrice));
+
+
+  SET vError = "UPDATE `accounts`, `orders` SET `order`='closed...";
+  UPDATE    `accounts`, `orders`
+  SET    `status` = 'msg', `accounts`.`balance` = `accounts`.`balance` + `orders`.`profit`, `orders`.`exited` = NOW(), `orders`.`close_price` = dPrice
+  WHERE    `accounts`.`id` = `orders`.`account_id` AND `orders`.`status` = 'closing';
+
+  COMMIT; 
+  
+  SET vDebug = CONCAT(vDebug, ":");
+  
+  SELECT (CONCAT(vDebug)) AS vResult;
+
+END

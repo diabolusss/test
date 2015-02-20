@@ -1,0 +1,58 @@
+BEGIN
+
+  DECLARE iOrder INT;
+  DECLARE vError VARCHAR (100);
+  DECLARE vDebug VARCHAR (100);
+  DECLARE EXIT HANDLER
+
+  FOR SQLEXCEPTION, SQLWARNING, NOT FOUND
+  BEGIN
+    ROLLBACK;
+    INSERT INTO `error_log` (`id`, `account_id`, `procedure`, `query`, `dump`, `timestamp`) VALUES (NULL, iAccount_Id, 'change_game_type', vError, CONCAT_WS(',', iType, iId, iOrder), NULL);
+    SELECT
+      CONCAT("Error ID: ", (SELECT
+        last_insert_id()));
+  END;
+
+  START TRANSACTION;
+
+  SET vDebug = "OK";
+  SET iOrder = (SELECT
+    COUNT(*)
+  FROM
+    `orders`
+  WHERE
+    `account_id` = iId AND NOT (`status` = 'closed'));
+
+  IF iOrder > 0 THEN
+    SET vError = "call sys_message error";
+    CALL sys_message(iId, 'change_game_error', '');
+  ELSE
+    SET vError = "UPDATE `accounts` SET `game_type`=iType WHERE `id`=iId";
+    UPDATE
+      `accounts`
+    SET
+      `game_type` = iType
+    WHERE
+      `id` = iId;
+
+    INSERT INTO `log` (`id`, `user_id`, `type`, `msg`, `ip`, `date`) VALUES (NULL, iId, 'change_game_type', CONCAT("type:", iType), '', NULL);
+
+    SET vError = "call sys_message complete";
+    IF (iType = 1) THEN
+      CALL sys_message(iId, 'game_type_newbie', '');
+    END IF;
+    IF (iType = 2) OR (iType = 3) OR (iType = 5) THEN
+      CALL sys_message(iId, 'game_type_master', '');
+    END IF;
+    IF (iType = 4) THEN
+      CALL sys_message(iId, 'game_type_extreme', '');
+    END IF;
+
+  END IF;
+  COMMIT;
+
+  SELECT
+    (CONCAT(vDebug));
+
+END

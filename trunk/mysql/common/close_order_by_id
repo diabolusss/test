@@ -1,0 +1,72 @@
+BEGIN
+  DECLARE dProfit  DOUBLE;
+  DECLARE iAcc_Id  INT;
+  DECLARE dPrice   DOUBLE;
+  DECLARE vMessage VARCHAR (100);
+  DECLARE vError   VARCHAR (100);
+  DECLARE vDebug   VARCHAR (100);
+  DECLARE vMSG     VARCHAR (100);
+
+  DECLARE EXIT HANDLER
+
+  FOR SQLEXCEPTION, SQLWARNING, NOT FOUND
+  BEGIN
+    ROLLBACK;
+    INSERT INTO `error_log` (`id`, `account_id`, `procedure`, `query`, `dump`, `timestamp`) VALUES (NULL, iAcc_Id, 'close_order_by_id', vError, CONCAT_WS(',', iId, dProfit, vMessage, vMSG), NULL);
+    SELECT
+      CONCAT("Error ID: ", (SELECT
+        last_insert_id()));
+  END;
+
+  START TRANSACTION;
+
+  SET vDebug = "OK";
+  SET vError = "SELECT `account_id` FROM orders...";
+  SET iAcc_Id = (SELECT
+    `account_id`
+  FROM
+    `orders`
+  WHERE
+    id = iId);
+
+  SET vError = "SELECT `profit` FROM orders...";
+  SET dProfit = (SELECT
+    `profit`
+  FROM
+    `orders`
+  WHERE
+    id = iId);
+
+  SET vError = "SELECT `price` FROM ticks WHERE id=(select max(id) from ticks)";
+  SET dPrice = (SELECT
+    `price`
+  FROM
+    ticks
+  WHERE
+    id = (SELECT
+      MAX(id)
+    FROM
+      ticks));
+
+  IF dProfit > 0 THEN
+    SET vMSG = "profit";
+  ELSE
+    SET vMSG = "lose";
+  END IF;
+
+  SET vError = CONCAT(iAcc_Id, ":", dPrice, ":", dProfit, ":", vMSG, "call sys_message ...");
+
+  CALL sys_message(iAcc_Id, "close_order", CONCAT(ROUND(dPrice, 4), "|", ROUND(dProfit, 2), " $", "&", vMSG));
+
+  SET vError = "UPDATE `orders` SET ...";
+  UPDATE
+    `orders`
+  SET
+    `orders`.`status` = 'closed'
+  WHERE
+    `orders`.`id` = iId;
+
+  COMMIT;
+  SELECT
+    vDebug AS vResult;
+END

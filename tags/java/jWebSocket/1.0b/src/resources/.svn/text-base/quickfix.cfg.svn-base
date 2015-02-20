@@ -1,0 +1,77 @@
+[default]
+# QuickFixJ specific parameters (please do not modify)
+# Default parameter settings for your client (modify/add as needed), to be applied to all sessions.
+#FileStorePath=data
+
+FileStorePath=logs/session/
+FileLogPath=logs/session/
+FileLogBackupPath=logs/session/backup
+
+ConnectionType=initiator
+MessageProcessingDelay=6000
+ReconnectInterval=5
+HeartBtInt=30
+LogonTimeout=120
+LogoutTimeout=120
+BeginString=FIX.4.4
+
+StartTime=00:00:00
+EndTime=00:00:00
+
+ResetOnLogon=Y
+
+Mode=mix
+Base=USD
+Pair=EURUSD
+Quantity=1000000
+
+UseDataDictionary=Y
+DataDictionary=xml/DUKAFIX44.xml
+
+SocketConnectPort=8890
+
+## CITIFX
+#SocketConnectHost=localhost
+
+
+## DUKAS
+SocketConnectHost=212.71.253.225
+
+## target identifier
+#TargetCompID=CITIFX
+TargetCompID=DUKASCOPYFIX
+
+## CITIFX account
+#Account=104923232
+#Username=AI130710
+#Password=1AI130710
+
+## DUKASFX account
+Username=DEMO3LoUMq
+Password=LoUMq
+
+#==============================================================
+#| Declare and configure quote and trade sessions
+#|  beginning with a '[session]' designator for each session.
+#==============================================================
+[session]
+SessionName=FEED
+
+##==== CITIFX
+#SenderCompID=RC20130621-Q
+#SenderCompID=AI130710-Q
+
+##==== DUKASFX
+SocketConnectPort=9443
+SenderCompID=FEED_DEMO3LoUMq_DEMOFIX
+
+[session]
+SessionName=TRADE
+
+##==== CITIFX
+#SenderCompID=RC20130621-T
+#SenderCompID=AI130710-T
+
+##==== DUKASFX
+SocketConnectPort=10443
+SenderCompID=DEMO3LoUMq_DEMOFIX

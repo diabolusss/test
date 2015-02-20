@@ -1,0 +1,54 @@
+BEGIN
+
+  DECLARE vError      VARCHAR (200);
+  DECLARE vDebug      VARCHAR (100);
+  
+  DECLARE iMinute     INT;
+  DECLARE iLastMinute INT;
+  DECLARE dtLastDate  DATETIME; 
+   
+  DECLARE iBar        INT;
+
+
+  DECLARE EXIT HANDLER
+  FOR SQLEXCEPTION, SQLWARNING, NOT FOUND
+  BEGIN
+    ROLLBACK;
+    INSERT INTO `error_log` (`id`, `account_id`, `procedure`, `query`, `dump`, `timestamp`) 
+    VALUES (NULL, 0, 'tick', vError, CONCAT_WS(',', dPrice, iMinute, iLastMinute, dtLastDate, iBar), NULL);
+    set vDebug = CONCAT("Error ID: ", (SELECT last_insert_id()));
+  END;
+
+  START TRANSACTION;
+
+  SET vDebug = "OK";
+
+  SET vError = "SELECT `timestamp` FROM `config` WHERE `status` = 'active'";
+  SET dtLastDate = (
+    SELECT    `timestamp`
+    FROM      `config`
+    WHERE     `status` = 'active'
+    );
+
+  SET vError = "Minutes";
+  SET iMinute = EXTRACT(MINUTE FROM NOW());
+  SET iLastMinute = EXTRACT(MINUTE FROM dtLastDate);
+  IF NOT (iMinute = iLastMinute) THEN
+    CALL new_minute();
+  END IF;
+
+  SET vError = "INSERT INTO `ticks` (`id`, `price`) VALUES (NULL, dPrice)";
+  INSERT INTO `ticks` (`id`, `price`) VALUES (NULL, dPrice);
+
+  COMMIT;
+
+  SET vError = "SELECT max(`id`) FROM `bars`";
+  SET iBar = (
+    SELECT    MAX(`id`)
+    FROM     `bars`
+    );
+
+  SET vDebug = CONCAT(vDebug, ":", iBar, ":");
+
+  SELECT (CONCAT(vDebug)) AS vResult;
+END

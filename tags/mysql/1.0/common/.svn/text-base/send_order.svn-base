@@ -1,0 +1,277 @@
+BEGIN
+  DECLARE dBalance         DOUBLE;
+  DECLARE iNew_Order       INT;
+  DECLARE iGame_Type       INT;
+  DECLARE iSpread          INT;
+  DECLARE iProfit_Points   INT;
+  DECLARE iStoploss_Points INT;
+  DECLARE iMax_Lot         INT;
+  DECLARE vError           VARCHAR (100);
+  DECLARE vDebug           VARCHAR (100);
+  DECLARE dPoint_Profit    DOUBLE;
+  DECLARE dPrice           DOUBLE;
+  DECLARE dOpen_Price      DOUBLE;
+  DECLARE iRef             INT;
+  DECLARE iPoint           INT;
+  DECLARE dTake_Profit     DOUBLE;
+  DECLARE dStop_Loss       DOUBLE;
+  DECLARE dProfit          DOUBLE;
+  DECLARE dRef_Bonus       DOUBLE;
+  DECLARE dBonus_Amount    DOUBLE;
+  DECLARE vEntered         VARCHAR (25);
+  DECLARE vExited          VARCHAR (25);
+  DECLARE vStatus          VARCHAR (10);
+  DECLARE dClose_Price     DOUBLE;
+  DECLARE iOrder_Count     INT;
+
+  DECLARE EXIT HANDLER
+  FOR SQLEXCEPTION, SQLWARNING, NOT FOUND
+  BEGIN
+    ROLLBACK;
+    INSERT INTO `error_log` (`id`, `account_id`, `procedure`, `query`, `dump`, `timestamp`) VALUES (NULL, iId, 'send_order', vError, CONCAT_WS(',', iId, dLot, vOrder_Type, dBalance, iNew_Order, iGame_Type, iSpread, iProfit_Points, iStoploss_Points, iMax_Lot, dPoint_Profit, dPrice, dOpen_Price, iRef, iPoint, dTake_Profit, dStop_Loss, dProfit, dRef_Bonus, dBonus_Amount, vEntered, vExited, vStatus, dClose_Price, iOrder_Count), NULL);
+    SELECT
+      CONCAT("Error ID: ", (SELECT
+        last_insert_id()));
+  END;
+
+  START TRANSACTION;
+
+  SET vDebug = "OK";
+
+  SET vError = "SELECT `point` FROM `config` WHERE `status` = 'active'";
+  SET iPoint = (SELECT
+    `point`
+  FROM
+    `config`
+  WHERE
+    `status` = 'active');
+
+
+  SET vError = "SELECT `ref_bonus` FROM `config` WHERE `status` = 'active'";
+  SET dRef_Bonus = (SELECT
+    `ref_bonus`
+  FROM
+    `config`
+  WHERE
+    `status` = 'active');
+
+  SET vError = "SELECT `balance` FROM `accounts` WHERE `id`=iId";
+  SET dBalance = (SELECT
+    `balance`
+  FROM
+    `accounts`
+  WHERE
+    `id` = iId);
+
+  SET vError = "SELECT `game_type` FROM `accounts` WHERE `id`=iId";
+  SET iGame_Type = (SELECT
+    `game_type`
+  FROM
+    `accounts`
+  WHERE
+    `accounts`.`id` = iId);
+
+  SET vError = "SELECT `spread` FROM `accounts` WHERE `id`=iId";
+  SET iSpread = (SELECT
+    `spread`
+  FROM
+    `game_types`, `accounts`
+  WHERE
+    `game_types`.`id` = `accounts`.`game_type` AND `accounts`.`id` = iId);
+
+  SET vError = "SELECT `profit_points` FROM `accounts` WHERE `id`=iId";
+  SET iProfit_Points = (SELECT
+    `take_profit`
+  FROM
+    `game_types`, `accounts`
+  WHERE
+    `game_types`.`id` = `accounts`.`game_type` AND `accounts`.`id` = iId);
+
+  IF (iProfit_Points = 0) THEN
+    SET iProfit_Points = ROUND(dBalance / dLot, 0) - 1;
+  END IF;
+
+  SET vError = "SELECT `stoploss_points` FROM `accounts` WHERE `id`=iId";
+  SET iStoploss_Points = (SELECT
+    `stop_loss`
+  FROM
+    `game_types`, `accounts`
+  WHERE
+    `game_types`.`id` = `accounts`.`game_type` AND `accounts`.`id` = iId);
+
+  IF (iStoploss_Points = 0) THEN
+    SET iStoploss_Points = ROUND(dBalance / dLot, 0) - 1;
+  END IF;
+
+
+  IF (iProfit_Points = -1) THEN
+    SET iProfit_Points = ROUND(dBalance / (dLot / iStoploss_Points), 0) - 1;
+  END IF;
+
+  IF (iStoploss_Points = -1) THEN
+    SET iStoploss_Points = ROUND(dBalance / (dLot / iProfit_Points), 0) - 1;
+  END IF;
+
+  SET vError = "SELECT `max_lot` FROM `accounts` WHERE `id`=iId";
+  SET iMax_Lot = (SELECT
+    `max_lot`
+  FROM
+    `game_types`, `accounts`
+  WHERE
+    `game_types`.`id` = `accounts`.`game_type` AND `accounts`.`id` = iId);
+
+  SET vError = "SELECT `referal` FROM `accounts` WHERE `id`=iId";
+  SET iRef = (SELECT
+    `referal`
+  FROM
+    `accounts`
+  WHERE
+    `id` = iId);
+
+  SET vError = "SELECT `price` FROM `ticks` WHERE `id` = (SELECT MAX(`id`) FROM `ticks`)";
+  SET dPrice = (SELECT
+    `price`
+  FROM
+    `ticks`
+  WHERE
+    `id` = (SELECT
+      MAX(`id`)
+    FROM
+      `ticks`));
+
+  SET vError = "SET iOrder_Count = (SELECT count(*)FROM`orders`WHERE`status`='open' and `account_id`=iId)";
+  SET iOrder_Count = (SELECT
+    COUNT(*)
+  FROM
+    `orders`
+  WHERE
+    `status` = 'open' AND `account_id` = iId
+  );
+
+
+  IF ((NOT (dBalance < dLot) AND NOT (iGame_Type = 4)) OR
+  ((NOT (dBalance < dLot * 10) AND (iGame_Type = 4)))) THEN
+    IF (iOrder_Count = 0) THEN
+      SET vError = "Order_Count=0";
+
+      IF (((iMax_Lot > 0) AND (dLot < iMax_Lot)) OR (iMax_Lot = 0)) AND ((NOT (dLot < 1) AND NOT (iGame_Type = 5)) OR (NOT (dLot < 2) AND (iGame_Type = 5))) THEN
+        SET vError = "Check Game_Types";
+
+        IF iGame_Type = 1 THEN
+          SET dPoint_Profit = dLot / iProfit_Points;
+        END IF;
+
+        IF iGame_Type = 2 THEN
+          SET dPoint_Profit = dLot / iProfit_Points;
+        END IF;
+
+        IF iGame_Type = 3 THEN
+          SET dPoint_Profit = dLot / iStoploss_Points;
+        END IF;
+
+        IF iGame_Type = 4 THEN
+          SET dPoint_Profit = dLot;
+          SET dLot = dBalance;
+        END IF;
+
+        IF iGame_Type = 5 THEN
+          SET dPoint_Profit = dLot / iProfit_Points;
+        END IF;
+
+        IF (vOrder_Type = "buy") THEN
+          SET dOpen_Price = dPrice + iSpread / iPoint;
+          SET dTake_Profit = dPrice + (iProfit_Points + iSpread) / iPoint;
+          SET dStop_Loss = dPrice - (iStoploss_Points - iSpread) / iPoint;
+          SET dProfit = dPoint_Profit * (dPrice - dOpen_Price) * iPoint;
+        END IF;
+
+
+        IF (vOrder_Type = "sell") THEN
+          SET dOpen_Price = dPrice - iSpread / iPoint;
+          SET dTake_Profit = dPrice - (iProfit_Points + iSpread) / iPoint;
+          SET dStop_Loss = dPrice + (iStoploss_Points - iSpread) / iPoint;
+          SET dProfit = dPoint_Profit * (dOpen_price - dPrice) * iPoint;
+        END IF;
+
+        IF (vOrder_Type = "buy") OR (vOrder_Type = "sell") THEN
+
+          SET vEntered = NOW();
+          SET vStatus = "open";
+          SET vExited = "";
+          SET dClose_Price = 0;
+
+          SET vError = "INSERT INTO `orders` (`id`,`type`,`entered`,`...";
+          INSERT INTO `orders` (`id`, `type`, `entered`, `open_price`, `lot`, `profit`, `stop_loss`, `take_profit`, `status`, `account_id`, `exited`, `close_price`, `profit_per_point`, `game_type`, `spread`) VALUES (NULL, vOrder_Type, vEntered, ROUND(dOpen_Price, 4), dLot, ROUND(dProfit, 2), ROUND(dStop_Loss, 4), ROUND(dTake_Profit, 4), vStatus, iId, vExited, dClose_Price, dPoint_Profit, iGame_Type, iSpread);
+
+          SET vError = "SELECT @@IDENTITY ...";
+          SET iNew_Order = (SELECT
+            @@IDENTITY AS 'Identity');
+
+          SET vError = "Messages order_accepted";
+
+          CALL sys_message(iId, "order_accepted", CONCAT("&accept&",iNew_Order,"&",iGame_Type,"&",dPoint_Profit));
+
+          SET vError = "Messages lot";
+          CALL sys_message(iId, "lot", dLot);
+
+          SET vError = "Messages entered";
+          CALL sys_message(iId, "entered", vEntered);
+
+          SET vError = "Messages open_price";
+          CALL sys_message(iId, "open_price", ROUND(dOpen_Price, 4));
+
+          SET vError = "Messages take_profit";
+          IF dTake_Profit > 0 THEN
+            CALL sys_message(iId, "take_profit", ROUND(dTake_Profit, 4));
+          ELSE
+            CALL sys_message(iId, "take_profit", "unlimited");
+          END IF;
+
+          SET vError = "Messages stop_loss";
+          IF dStop_Loss > 0 THEN
+            CALL sys_message(iId, "stop_loss", ROUND(dStop_Loss, 4));
+          ELSE
+            CALL sys_message(iId, "stop_loss", "unlimited");
+          END IF;
+
+          SET vError = "Messages ref_payment";
+          IF iRef > 0 THEN
+            SET dBonus_Amount = dRef_Bonus * dPoint_Profit;
+            SET vError = "UPDATE accounts SET `balance` = `balance` + dBonus_Amount WHERE `id` = iRef";
+            UPDATE
+              accounts
+            SET
+              `balance` = `balance` + dBonus_Amount, `check` = 1
+            WHERE
+              `id` = iRef;
+            CALL sys_message(iRef, "ref_payment", dBonus_Amount);
+            SET vError = "insert into ref_payment ...";
+            INSERT INTO `ref_payments` (`id`, `account_id`, `referal_id`, `referal_payment`, `order_id`) VALUES (NULL, iRef, iId, dBonus_Amount, iNew_Order);
+          END IF;
+        ELSE
+          CALL sys_message(iId, "incorrect_order_type", "");
+        END IF;
+      ELSE
+        IF iGame_Type = 1 THEN
+          CALL sys_message(iId, "incorrect_order_lot_piggy", "");
+        END IF;
+        IF iGame_Type = 5 THEN
+          CALL sys_message(iId, "incorrect_order_lot_swine", "");
+        END IF;
+        IF iGame_Type = 4 THEN
+          CALL sys_message(iId, "incorrect_order_lot_wildboar", "");
+        END IF;
+      END IF;
+    ELSE
+      CALL sys_message(iId, "too_many_orders", iOrder_Count);
+    END IF;
+  ELSE
+    CALL sys_message(iId, "too_small_balance", dBalance);
+  END IF;
+
+  COMMIT;
+
+  SELECT
+    (CONCAT(vDebug));
+
+END

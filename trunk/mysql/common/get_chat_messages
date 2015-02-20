@@ -1,0 +1,63 @@
+BEGIN
+
+  DECLARE iLast_Message     INT;
+  DECLARE iNew_Last_Message INT;
+  DECLARE vError            VARCHAR (100);
+  DECLARE vDebug            VARCHAR (100);
+
+  DECLARE EXIT HANDLER
+
+  FOR SQLEXCEPTION, SQLWARNING, NOT FOUND
+  BEGIN
+    ROLLBACK;
+    INSERT INTO `error_log` (`id`, `account_id`, `procedure`, `query`, `dump`, `timestamp`) VALUES (NULL, iAccount_Id, 'get_chat_messages', vError, CONCAT_WS(',', iId, iLast_Message, iNew_Last_Message), NULL);
+    SELECT
+      CONCAT("Error ID: ", (SELECT
+        last_insert_id()));
+  END;
+
+  START TRANSACTION;
+
+  SET vError = "SELECT `chat_id` FROM `accounts` WHERE id=iId";
+  SET iLast_Message = (SELECT
+    `chat_id`
+  FROM
+    `accounts`
+  WHERE
+    id = iId);
+
+  SET vError = "SELECT `id` FROM `chats` WHERE `id` = (SELECT max(`id`)...";
+  SET iNew_Last_Message = (SELECT
+    `id`
+  FROM
+    `chats`
+  WHERE
+    `id` = (SELECT
+      MAX(`id`)
+    FROM
+      `chats`
+    WHERE
+      `to` = iId OR `from` = iId));
+
+  IF (iNew_Last_Message > iLast_Message) THEN
+    SET vError = "UPDATE `accounts` SET `chat_id` = iNew_Last_Message WHERE id = iId";
+
+    UPDATE
+      `accounts`
+    SET
+      `chat_id` = iNew_Last_Message
+    WHERE
+      id = iId;
+
+    SET vError = "SELECT `id` FROM `chats` WHERE `id`>= iLast_Message AND `to` = iId";
+    SELECT
+      `id`, `from`, `to`, `text`, `timestamp`, `win`
+    FROM
+      `chats`
+    WHERE
+      `id` > iLast_Message AND (`to` = iId OR `from` = iId);
+  END IF;
+
+  COMMIT;
+
+END

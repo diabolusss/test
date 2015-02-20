@@ -1,0 +1,27 @@
+BEGIN
+  DECLARE tStr        TEXT DEFAULT 'OK';
+  DECLARE iCursorDone INT DEFAULT 0;
+  DECLARE iAccId      INT DEFAULT 0;
+
+  DECLARE rCursor CURSOR FOR
+  SELECT
+    `id`
+  FROM
+    `accounts`
+  WHERE
+    `check` = 1;
+
+  DECLARE CONTINUE HANDLER FOR SQLSTATE '02000' SET iCursorDone = 1;
+
+  SET tStr = CONCAT(tStr, ":");
+
+  OPEN rCursor;
+  WHILE iCursorDone = 0
+  DO
+    SET tStr = CONCAT(tStr, iAccId, ":");
+    FETCH rCursor INTO iAccId;
+  END WHILE;
+  CLOSE rCursor;
+  SET @checkline = tStr;
+
+END

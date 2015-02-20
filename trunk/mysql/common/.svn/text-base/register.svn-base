@@ -1,0 +1,43 @@
+BEGIN
+  DECLARE vDebug   VARCHAR (100);
+  DECLARE vError   VARCHAR (100);
+  DECLARE vQuery   VARCHAR (100);
+  DECLARE iLoginID INT;
+
+  DECLARE EXIT HANDLER
+  FOR SQLEXCEPTION, SQLWARNING, NOT FOUND
+  BEGIN
+    ROLLBACK;
+    INSERT INTO `error_log` (`id`, `account_id`, `procedure`, `query`, `dump`, `timestamp`) VALUES (NULL, iAccount_Id, 'register', vError, CONCAT_WS(',', vLogin, vPassword, vEMail, iReferal, vQuery, iLoginID), NULL);
+    SELECT
+      CONCAT("Error ID: ", (SELECT
+        last_insert_id()));
+  END;
+
+  START TRANSACTION;
+
+  SET vDebug = "OK";
+  SET iLoginID = 0;
+
+  SET vError = "SELECT count(*) FROM `accounts` WHERE `login`=vLogin";
+  SET iLoginID = (SELECT
+    COUNT(*)
+  FROM
+    `accounts`
+  WHERE
+    `login` = vLogin);
+
+  SET vError = "1";
+  IF (iLoginID > 0) THEN
+    SET vDebug = "User_exist";
+  ELSE
+    SET vError = "INSERT INTO accounts ...";
+    INSERT INTO `accounts`
+    (`id`, `balance`, `spread`, `profit_points`, `stoploss_points`, `login`, `password`, `mail`, `order_type`, `max_lot`, `lot`, `ip`, `referal`) VALUES (NULL, 0, 2, 20, 20, vLogin, vPassword, vEMail, '', 50, 0, '', iReferal);
+  END IF;
+
+  COMMIT;
+
+  SELECT
+    (CONCAT(vDebug));
+END

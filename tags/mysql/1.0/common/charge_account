@@ -1,0 +1,42 @@
+BEGIN
+
+  DECLARE iSumm  INT;
+  DECLARE vError VARCHAR (100);
+  DECLARE vDebug VARCHAR (100);
+  DECLARE EXIT HANDLER
+
+  FOR SQLEXCEPTION, SQLWARNING, NOT FOUND
+  BEGIN
+    ROLLBACK;
+    INSERT INTO `error_log` (`id`, `account_id`, `procedure`, `query`, `dump`, `timestamp`) VALUES (NULL, iAccount_Id, 'charge_account', vError, CONCAT_WS(',', iId, iSumm), NULL);
+    SELECT
+      CONCAT("Error ID: ", (SELECT
+        last_insert_id()));
+  END;
+
+  START TRANSACTION;
+
+  SET vDebug = "OK";
+  SET iSumm = 100;
+
+  SET vError = "call sys_message";
+  CALL sys_message(iId, 'charge_account', iSumm);
+
+  SET vError = "UPDATE `accounts` SET `balance`=`balance`+iSumm, `check`=`1` WHERE `id`=iId";
+  UPDATE
+    `accounts`
+  SET
+    `balance` = `balance` + iSumm, `check` = 1
+  WHERE
+    `id` = iId;
+
+  SET vError = "INSERT INTO moneyflow (summ,account_id,comment)VALUES(iSumm, iId,'')";
+
+  INSERT INTO moneyflow (`summ`, `account_id`, `status`, `COMMENT`) VALUES (iSumm, iId, 'success', 'Demo charging');
+
+  COMMIT;
+
+  SELECT
+    (CONCAT(vDebug));
+
+END

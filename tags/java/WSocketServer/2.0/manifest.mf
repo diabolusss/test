@@ -1,0 +1,5 @@
+Manifest-Version: 1.0
+X-COMMENT: Main-Class will be added automatically by build
+Main-Class: wsocketserver.WSocketServer
+Class-Path: Java-WebSocket-1.3.1-SNAPSHOT.jar ../lib/Emailer.jar ../lib/CustomJDBC.jar ../lib/Functions.jar
+

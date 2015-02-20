@@ -1,0 +1,39 @@
+BEGIN
+
+  SET @msg = (SELECT
+    `msg`
+  FROM
+    dictionary
+  WHERE
+   `lang` = (SELECT
+      `lang`
+    FROM
+      `user`
+    WHERE
+      `id` = iId) AND `name` = vName AND `win` < 2);
+
+
+  SET @win = (SELECT
+    `win`
+  FROM
+    dictionary
+  WHERE
+    `lang` = (SELECT
+      `lang`
+    FROM
+      `user`
+    WHERE
+      `id` = iId) AND `name` = vName AND `win` < 2);
+
+  SET @msg = CONCAT(@msg, vParam);
+
+  INSERT INTO `messages` (`id`, `from`, `to`, `text`, `timestamp`, `win`) VALUES (NULL, 0, iId, @msg, NULL, @win);
+
+  UPDATE
+    `accounts`
+  SET
+    `check` = 1
+  WHERE
+    `id` = iId;
+
+END

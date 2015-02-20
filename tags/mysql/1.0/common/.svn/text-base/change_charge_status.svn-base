@@ -1,0 +1,101 @@
+BEGIN
+
+  DECLARE iAccount_Id INT (11) DEFAULT 0;
+  DECLARE dSumm       DOUBLE;
+  DECLARE vError      VARCHAR (100);
+  DECLARE vCurrStatus VARCHAR (10);
+  DECLARE vDebug      VARCHAR (100);
+
+  DECLARE EXIT HANDLER
+
+  FOR SQLEXCEPTION, SQLWARNING, NOT FOUND
+  BEGIN
+    ROLLBACK;
+    INSERT INTO `error_log` (`id`, `account_id`, `procedure`, `query`, `dump`, `timestamp`) VALUES (NULL, iAccount_Id, 'change_charge_status', vError, CONCAT_WS(',', iId, sStatus, vCurrStatus, iAccount_Id, dSumm), NULL);
+    SELECT
+      CONCAT("Error ID: ", (SELECT
+        LAST_INSERT_ID()));
+  END;
+
+  START TRANSACTION;
+
+  SET vDebug = "OK";
+  SET vError = "SET dSumm = (SELECT `summ` FROM `moneyflow`WHERE `id` = iId)";
+  SET dSumm = (SELECT
+    `summ`
+  FROM
+    `moneyflow`
+  WHERE
+    `id` = iId);
+
+  SET vError = "SET iAccount_Id = (SELECT `account_id` FROM `moneyflow` WHERE `id`=iId);";
+  SET iAccount_Id = (SELECT
+    `account_id`
+  FROM
+    `moneyflow`
+  WHERE
+    `id` = iId);
+
+  SET vError = "SET vCurrStatus = (SELECT `status` FROM `moneyflow` WHERE `id`=iId);";
+  SET vCurrStatus = (SELECT
+    `status`
+  FROM
+    `moneyflow`
+  WHERE
+    `id` = iId);
+
+  SET vError = CONCAT("call sys_message", iAccount_Id, ":", iId);
+  IF sStatus = "process" THEN
+    CALL sys_message(iAccount_Id, 'process_charge_status', iId);
+  END IF;
+  IF sStatus = "success" THEN
+    CALL sys_message(iAccount_Id, 'success_charge_status', iId);
+  END IF;
+  IF sStatus = "fail" THEN
+    CALL sys_message(iAccount_Id, 'fail_charge_status', iId);
+  END IF;
+  IF sStatus = "wait" THEN
+    CALL sys_message(iAccount_Id, 'wait_withdraw_status', iId);
+  END IF;
+  IF sStatus = "approve" THEN
+    CALL sys_message(iAccount_Id, 'approve_withdraw_status', iId);
+  END IF;
+  IF sStatus = "decline" THEN
+    CALL sys_message(iAccount_Id, 'decline_withdraw_status', iId);
+  END IF;
+
+  IF (sStatus = "success" AND vCurrStatus = "order") OR (sStatus = "approve" AND vCurrStatus = "wait") THEN
+    SET vError = "UPDATE `accounts` SET `balance`=`balance`+ ROUND(iSumm,2), `check`=1 WHERE `id`=iId";
+    UPDATE
+      `accounts`
+    SET
+      `balance` = `balance` + ROUND(dSumm, 2), `check` = 1
+    WHERE
+      `id` = iAccount_Id;
+  ELSE
+    SET vDebug = "Account already paid";
+  END IF;
+
+  SET vError = "UPDATE `moneyflow` SET `status` = sStatus ...";
+  UPDATE
+    `moneyflow`
+  SET
+    `status` = sStatus, `justpay` = 1
+  WHERE
+    `id` = iId;
+
+  IF (sStatus = "success") THEN
+	UPDATE
+	    `moneyflow`
+	SET
+	    `justpay` = 1
+	WHERE
+	    `id` = iId;
+  END IF;
+
+  COMMIT;
+
+  SELECT
+    (CONCAT(vDebug)) AS vResult;
+
+END

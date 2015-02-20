@@ -1,0 +1,60 @@
+BEGIN
+
+  DECLARE dMax   DOUBLE;
+  DECLARE dMin   DOUBLE;
+  DECLARE dOpen  DOUBLE;
+  DECLARE dClose DOUBLE;
+  DECLARE vError VARCHAR (200);
+  DECLARE vDebug VARCHAR (100);
+
+
+  SET vError = "SELECT MAX(`price`) FROM `ticks`";
+  SET dMax = (SELECT
+    MAX(`price`)
+  FROM
+    `ticks`);
+  SET vError = "SELECT MIN(`price`) FROM `ticks`";
+  SET dMin = (SELECT
+    MIN(`price`)
+  FROM
+    `ticks`);
+  SET vError = "SELECT `price` FROM `ticks` WHERE `id` = (SELECT MIN(`id`) FROM `ticks`)";
+  SET dOpen = (SELECT
+    `price`
+  FROM
+    `ticks`
+  WHERE
+    `id` = (SELECT
+      MIN(`id`)
+    FROM
+      `ticks`));
+  SET vError = "SELECT `price` FROM `ticks` WHERE `id` = (SELECT MAX(`id`) FROM `ticks`)";
+  SET dClose = (SELECT
+    `price`
+  FROM
+    `ticks`
+  WHERE
+    `id` = (SELECT
+      MAX(`id`)
+    FROM
+      `ticks`));
+
+
+
+  SET vError = "INSERT INTO `bars` (`id`, `hi`, `low`, `open`, `close`,`timestamp`) VALUES (NULL, dMax, dMin, dOpen, dClose, NOW())";
+  INSERT INTO `bars` (`id`, `hi`, `low`, `open`, `close`, `timestamp`) VALUES (NULL, dMax, dMin, dOpen, dClose, NOW());
+
+  SET vError = "UPDATE `config` SET `minute` = Now() WHERE `status` = 'active'";
+  UPDATE
+    `config`
+  SET
+    `timestamp` = NOW()
+  WHERE
+    `status` = 'active';
+
+  SET vError = "DELETE FROM `ticks`";
+  DELETE
+  FROM
+    `ticks`;
+
+END

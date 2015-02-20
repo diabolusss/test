@@ -1,0 +1,133 @@
+BEGIN
+
+  DECLARE dAmount      DOUBLE DEFAULT 0;
+  DECLARE dBuy         DOUBLE DEFAULT 0;
+  DECLARE dSell        DOUBLE DEFAULT 0;
+  DECLARE dBuy_Open    DOUBLE DEFAULT 0;
+  DECLARE dSell_Open   DOUBLE DEFAULT 0;
+  DECLARE dBuy_Close   DOUBLE DEFAULT 0;
+  DECLARE dSell_Close  DOUBLE DEFAULT 0;
+  DECLARE vDebug       VARCHAR (255);
+  DECLARE vError       VARCHAR (255);
+  DECLARE iLastId      INT DEFAULT 0;
+  DECLARE iCount_Open  INT DEFAULT 0;
+  DECLARE iCount_Close INT DEFAULT 0;
+  DECLARE iCount       INT DEFAULT 0;
+  DECLARE iUser        INT DEFAULT 416;
+  
+  DECLARE EXIT HANDLER
+
+  FOR SQLEXCEPTION, SQLWARNING, NOT FOUND
+  BEGIN
+    SELECT
+      CONCAT("Error:", vError) AS `error`;
+    ROLLBACK;
+  END;
+
+  START TRANSACTION;
+
+  SET vDebug = "OK";
+
+  SET vError = "SELECT Count open";
+  SET iCount_Open = (SELECT
+    COUNT(*)
+  FROM
+    `orders`
+  WHERE
+    (`game_type` = 4)
+    AND `market_open_id` IS NULL
+    AND `status` = "open");
+
+  SET vError = "SELECT Count closed";
+  SET iCount_Close = (SELECT
+    COUNT(*)
+  FROM
+    `orders`
+  WHERE
+    (`game_type` = 4)
+    AND `market_close_id` IS NULL
+    AND `status` = "closed");
+
+  SET iCount = iCount_Open + iCount_Close;
+
+  SET vError = "SELECT sum(`profit_per_point`) buy";
+  SET dBuy_Open = IFNULL((SELECT
+    SUM(`profit_per_point`)
+  FROM
+    `orders`
+  WHERE
+    (`market_open_id` IS NULL
+    AND `status` = "open")
+    AND (`game_type` = 4)
+    AND `type` = "buy"), 0);
+
+  SET dBuy_Close = IFNULL((SELECT
+    SUM(`profit_per_point`)
+  FROM
+    `orders`
+  WHERE
+    (`market_close_id` IS NULL
+    AND `status` = "closed")
+    AND (`game_type` = 4)
+    AND `type` = "buy"), 0);
+
+  SET vError = "SELECT sum(`profit_per_point`) buy";
+  SET dSell_Open = IFNULL((SELECT
+    SUM(`profit_per_point`)
+  FROM
+    `orders`
+  WHERE
+    (`market_open_id` IS NULL
+    AND `status` = "open")
+    AND (`game_type` = 4)
+    AND `type` = "sell"), 0);
+
+  SET dSell_Close = IFNULL((SELECT
+    SUM(`profit_per_point`)
+  FROM
+    `orders`
+  WHERE
+    (`market_close_id` IS NULL
+    AND `status` = "closed")
+    AND (`game_type` = 4)
+    AND `type` = "sell"), 0);
+
+  SET dAmount = ((dBuy_Open - dBuy_Close) - (dSell_Open - dSell_Close));
+
+  IF iCount > 0 AND dAmount <> 0 THEN
+    SET vError = "Inserting new position for market";
+    INSERT INTO `market_orders` (`amount`, `status`) VALUES (dAmount, "opening");
+    SET iLastId = LAST_INSERT_ID();
+
+    SET vError = "Updating open orders with market open id";
+    UPDATE
+      `orders`
+    SET
+      `market_open_id` = iLastId
+    WHERE
+      `market_open_id` IS NULL
+      AND (`game_type` = 4);
+
+    UPDATE
+      `orders`
+    SET
+      `market_close_id` = iLastId
+    WHERE
+      `market_close_id` IS NULL
+      AND `status` = "closed"
+      AND (`game_type` = 4);
+  END IF;
+
+  COMMIT;
+
+  IF iLastId > 0 THEN
+    SELECT
+      iCount AS `count`
+      , iLastId AS `clordid`
+      , dAmount AS `amount`;
+  ELSE
+    SELECT
+      iCount AS `count`;
+  END IF;
+
+END

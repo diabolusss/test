@@ -1,0 +1,44 @@
+BEGIN
+
+  DECLARE vError VARCHAR (100);
+  DECLARE vDebug VARCHAR (100);
+  DECLARE EXIT HANDLER
+
+  FOR SQLEXCEPTION, SQLWARNING, NOT FOUND
+  BEGIN
+    ROLLBACK;
+    INSERT INTO `error_log` (`id`, `account_id`, `procedure`, `query`, `dump`, `timestamp`) VALUES (NULL, iId, 'bonus_robot', vError, CONCAT_WS(',', iId, sBonus), NULL);
+    SELECT
+      CONCAT("Error ID: ", (SELECT
+        last_insert_id()));
+  END;
+
+  START TRANSACTION;
+  
+SET vDebug = "OK";
+
+SET vError = "UPDATE user SET bonus_robot = 2 WHERE id = '=iId";
+  UPDATE
+    `user`
+  SET
+    `bonus_robot` = 2
+  WHERE
+    `id` = iId;
+
+SET vError = "UPDATE `accounts` SET `balance`=`balance`+iSumm, `check`=`1` WHERE `id`=iId";
+  UPDATE
+    `accounts`
+  SET
+    `balance` = `balance` + sBonus, `check` = 1
+  WHERE
+    `id` = iId;
+
+SET vError = "INSERT INTO moneyflow (summ,account_id,`status`, `COMMENT`)VALUES(iSumm, iId,'')";
+
+INSERT INTO moneyflow (`summ`, `account_id`, `status`, `COMMENT`) VALUES (sBonus, iId, 'success', 'Bonus for robot');
+	
+COMMIT;
+
+  SELECT
+    (CONCAT(vDebug));
+END

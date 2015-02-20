@@ -1,0 +1,50 @@
+BEGIN
+
+  DECLARE iPoint      INT;
+  DECLARE vError      VARCHAR (200);
+  DECLARE vDebug      VARCHAR (100);
+
+
+  DECLARE EXIT HANDLER
+  FOR SQLEXCEPTION, SQLWARNING, NOT FOUND
+  BEGIN
+    ROLLBACK;
+    INSERT INTO `error_log` (`id`, `account_id`, `procedure`, `query`, `dump`, `timestamp`) VALUES (NULL, 0, 'update_profit', vError, CONCAT_WS(',', dPrice, iPoint), NULL);
+    set vDebug = CONCAT("Error ID: ", (SELECT last_insert_id()));
+  END;
+
+  START TRANSACTION;
+
+  SET vDebug = "OK";
+  SET vError = "SELECT `point` FROM `config` WHERE `status` = 'active'";
+  SET iPoint = (
+    SELECT    `point`
+    FROM    `config`
+    WHERE    `status` = 'active');
+
+
+  SET vError = "UPDATE `orders` SET `profit` = ROUND((dPrice - `open_price`) * iPoint * `profit_per_point`) WHERE `status` = 'open' AND `type` = 'buy'";
+  UPDATE    `orders`, `accounts`
+  SET    `accounts`.`check` = 1, `orders`.`profit` = ROUND((dPrice - `open_price`) * iPoint * `profit_per_point`, 2)
+  WHERE    `status` = 'open' AND `type` = 'buy' AND `orders`.`account_id` = `accounts`.`id`;
+
+  SET vError = "UPDATE `orders` SET `profit` = ROUND((`open_price` - dPrice) * iPoint * `profit_per_point`) WHERE `status` = 'open' AND `type` = 'sell'";
+  UPDATE    `orders`, `accounts`
+  SET    `accounts`.`check` = 1, `profit` = ROUND((`open_price` - dPrice) * iPoint * `profit_per_point`, 2)
+  WHERE    `status` = 'open' AND `type` = 'sell' AND `orders`.`account_id` = `accounts`.`id`;
+
+  SET vError = "UPDATE `orders` SET `profit` = `lot` WHERE `profit`>`lot`";
+  UPDATE    `orders`
+  SET    `profit` = `lot`
+  WHERE    `profit` > `lot` AND `status` <> 'closed';
+
+  SET vError = "UPDATE `orders` SET `profit` = (-1)*`lot` WHERE `profit`<(-1)*`lot`";
+  UPDATE    `orders`
+  SET    `profit` = (-1) * `lot`
+  WHERE    `profit` < (-1) * `lot` AND `status` <> 'closed';
+
+  COMMIT; 
+  
+  SELECT (CONCAT(vDebug)) AS vResult;
+
+END

@@ -1,0 +1,86 @@
+BEGIN
+
+  DECLARE iLast_Message     INT DEFAULT 0;
+  DECLARE iNew_Last_Message INT DEFAULT 0;
+  DECLARE sys_messages      INT DEFAULT 0;
+  DECLARE win_sys_messages  INT DEFAULT 0;
+  DECLARE vError            VARCHAR (100);
+  DECLARE vDebug            VARCHAR (100);
+
+  DECLARE EXIT HANDLER
+
+  FOR SQLEXCEPTION, SQLWARNING, NOT FOUND
+  BEGIN
+    ROLLBACK;
+    INSERT INTO `error_log` (`id`, `account_id`, `procedure`, `query`, `dump`, `timestamp`) VALUES (NULL, iAccount_Id, 'get_messages', vError, CONCAT_WS(',', iId, dProfit, vMessage, vMSG, sys_messages, win_sys_messages), NULL);
+    SELECT
+      CONCAT("Error ID: ", (SELECT
+        last_insert_id()));
+  END;
+
+  START TRANSACTION;
+
+  SET vError = "SELECT `message_id` FROM `accounts` WHERE `id`=iId";
+  SET iLast_Message = (SELECT
+    `message_id`
+  FROM
+    `accounts`
+  WHERE
+    `id` = iId);
+
+  SET vError = "SELECT `id` FROM `messages` WHERE `id` = (SELECT max(`id`)...";
+  SET iNew_Last_Message = (SELECT
+    `id`
+  FROM
+    `messages`
+  WHERE
+    `id` = (SELECT
+      MAX(`id`)
+    FROM
+      `messages`
+    WHERE
+      `to` = iId OR `from` = iId));
+
+  IF (iNew_Last_Message > iLast_Message) THEN
+    SET vError = "UPDATE `accounts` SET `message_id` = iNew_Last_Message WHERE id = iId";
+
+    UPDATE
+      `accounts`
+    SET
+      `message_id` = iNew_Last_Message
+    WHERE
+      id = iId;
+
+    SET vError = "SELECT COUNT(*) AS sys_messages FROM `messages` WHERE `id`>= iLast_Message AND `to` = iId";
+    SET sys_messages = (SELECT
+      COUNT(*) AS sys_messages
+    FROM
+      `messages`
+    WHERE
+      `id` > iLast_Message AND (`to` = iId OR `from` = iId));
+
+    SET vError = "SELECT COUNT(*) AS sys_messages FROM `messages` WHERE `id`>= iLast_Message AND `to` = iId";
+    SET win_sys_messages = (SELECT
+      COUNT(*) AS win_sys_messages
+    FROM
+      `messages`
+    WHERE
+      `id` > iLast_Message AND (`to` = iId OR `from` = iId) AND `win` = 1);
+
+    IF win_sys_messages > 0 THEN
+      SET vError = "SELECT `text` FROM `messages` WHERE `id`>= iLast_Message AND `to` = iId AND `win` = 1";
+      SELECT
+        `text`, sys_messages
+      FROM
+        `messages`
+      WHERE
+        `id` > iLast_Message AND (`to` = iId OR `from` = iId) AND `win` = 1;
+    ELSE
+      SELECT
+        NULL AS `text`, sys_messages;
+    END IF;
+  END IF;
+
+  COMMIT;
+
+END

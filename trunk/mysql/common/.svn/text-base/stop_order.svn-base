@@ -1,0 +1,100 @@
+BEGIN
+
+  DECLARE dProfit      DOUBLE;
+  DECLARE dPrice       DOUBLE;
+  DECLARE dOrder_Price DOUBLE;
+  DECLARE iAllow_Stop  INT;
+  DECLARE iPoint       INT;
+  DECLARE vMessage     VARCHAR (100);
+  DECLARE vError       VARCHAR (100);
+  DECLARE vDebug       VARCHAR (100);
+  DECLARE vMSG         VARCHAR (100);
+  DECLARE EXIT HANDLER
+
+  FOR SQLEXCEPTION, SQLWARNING, NOT FOUND
+  BEGIN
+    ROLLBACK;
+    INSERT INTO `error_log` (`id`, `account_id`, `procedure`, `query`, `dump`, `timestamp`) VALUES (NULL, iId, 'stop_order', vError, CONCAT_WS(',', iId, dProfit, dPrice, dOrder_Price, iAllow_Stop, iPoint, vMessage, vMSG), NULL);
+    SELECT
+      CONCAT("Error ID: ", (SELECT
+        last_insert_id()));
+  END;
+
+  START TRANSACTION;
+
+  SET vDebug = "OK";
+
+  SET vError = "SELECT `point` FROM `config` WHERE `status`=1";
+  SET iPoint = (SELECT
+    `point`
+  FROM
+    `config`
+  WHERE
+    `status` = 'active');
+
+  SET vError = "SELECT `allow_stop` FROM `accounts` WHERE `id`=iId";
+  SET iAllow_Stop = (SELECT
+    `allow_stop`
+  FROM
+    `game_types`, `accounts`
+  WHERE
+    `game_types`.`id` = `accounts`.`game_type` AND `accounts`.`id` = iId);
+
+  SET vError = "SELECT `profit` FROM orders WHERE account_id=iId and status='open'";
+  SET dProfit = (SELECT
+    `profit`
+  FROM
+    `orders`
+  WHERE
+    `account_id` = iId AND `status` = 'open');
+
+  SET vError = "SELECT `open_price` FROM orders WHERE account_id=iId and status='open'";
+  SET dOrder_Price = (SELECT
+    `open_price`
+  FROM
+    `orders`
+  WHERE
+    `account_id` = iId AND `status` = 'open');
+
+  SET vError = "SELECT `price` FROM ticks WHERE id=(select max(id) from ticks)";
+  SET dPrice = (SELECT
+    `price`
+  FROM
+    ticks
+  WHERE
+    id = (SELECT
+      MAX(id)
+    FROM
+      ticks));
+
+  IF (dOrder_Price + (iAllow_Stop / iPoint) < dPrice) OR (dOrder_Price - (iAllow_Stop / iPoint) > dPrice) THEN
+
+    SET vError = "SET vMSG = ...";
+    IF dProfit > 0 THEN
+      SET vMSG = "profit";
+    ELSE
+      SET vMSG = "lose";
+    END IF;
+
+    SET vError = CONCAT("call sys_message 'close_order'...");
+    CALL sys_message(iId, "close_order", CONCAT(ROUND(dPrice, 4), "|", ROUND(dProfit, 2), " $", "&", vMSG));
+    SET vError = "UPDATE `accounts`, `orders` SET `order`='closed...";
+    UPDATE
+      `accounts`, `orders`
+    SET
+      `accounts`.`check` = '1', `orders`.`status` = 'closed', `accounts`.`balance` = `accounts`.`balance` + `orders`.`profit`, `orders`.`exited` = NOW(), `orders`.`close_price` = dPrice
+    WHERE
+      `accounts`.`id` = iId AND `orders`.`account_id` = iId AND `orders`.`status` = 'open';
+
+
+  ELSE
+    SET iAllow_Stop = iAllow_Stop - 1;
+    CALL sys_message(iId, "too_close_price", iAllow_Stop);
+  END IF;
+
+  COMMIT;
+
+  SELECT
+    (CONCAT(vDebug));
+
+END

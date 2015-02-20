@@ -1,0 +1,111 @@
+application_uid=FixClient-real#
+
+######################################################
+## SYSTEM
+######################################################
+# reset script command. run at failure and startup
+run_bash=sh fixstatusmanager
+
+
+
+######################################################
+## SECURITY
+######################################################
+# is websocket server is secured(TLS tunneling enabled)
+secured_socket=false
+
+##path to keystore
+tls_key=../tls_cert/sockets_v-kurse_com.jks
+tls_keystore_type=JKS
+
+######################################################
+## SOCKETS
+######################################################
+# used ONLY if SECURED(wss://)[without prefix]
+tls_wsocket_server_host_set=localhost:4444,sockets.v-kurse.com:8885,sockets.v-kurse.com:8886,sockets.v-kurse.com:8887,sockets.v-kurse.com:8888,sockets.v-kurse.com:8889
+
+# used ONLY if NON_SECURED(ws://)[without prefix]
+wsocket_server_host_set=localhost:4444,sockets.v-kurse.com:8880,sockets.v-kurse.com:8881,sockets.v-kurse.com:8882,sockets.v-kurse.com:8883,sockets.v-kurse.com:8884
+
+# used INDEPENDINGLY on secured status[write with prefix(ws:// or wss://)]
+custom_wsserver_host_set=null
+# ws://sockets.v-kurse.com:8880
+# ,ws://sockets.v-kurse.com:8881,ws://sockets.v-kurse.com:8882,ws://sockets.v-kurse.com:8883,ws://sockets.v-kurse.com:8884
+
+#websocket availabnes checker
+delay_to_restore_conn=1000
+
+######################################################
+## DATABASE
+######################################################
+# must have:
+#  jdbc_real_database, jdbc_demo_database, jdbc_host, jdbc_username, jdbc_password, jdbc_max_connections
+jdbc_props_path=../jdbc_props/v-kurse.com.properties
+
+# date_time format stored in database
+date_time_format=yyyy-MM-dd HH:mm:ss.S
+
+######################################################
+## Dukas Tick manager settings
+######################################################
+# dukas specific settings
+fix_props_path=quickfix.properties
+
+# how ofter to check fix on\off date time
+schedule_time_check_interval=5000
+
+# Tick Manager mode
+#  real - dont mix price from dukas 
+#  mix - mix price between two dukas ticks
+tick_manager_mode=real
+
+# Fix Client mode
+#  force_auto - run auto rate instead of dukas
+#  auto - enable auto on weekends when dukas is off
+#  real - connect only to real dukas
+rate_mode=auto
+
+# if mix enabled spread is used
+mix_spread=30
+
+# precision after point, i.e. rounded_up to 4 digits: 1.1235)
+# final price -> will be sent to other nodes with this precision
+price_output_precision=5
+
+# For controlling mixing frequence
+# how much ticks occure in one minute
+# NOT USED 
+tick_count_per_minute=10
+
+# delay between two ticks[ms]
+# if faster than that, mix will be omitted
+time_per_tick=700
+
+######################################################
+## Auto fix new properties
+######################################################
+
+# simple backoff settings
+init_sleep_before_try=50
+restore_connection_max_tries=30
+
+# random size of offset array
+max_mix_offset_block_size=1000
+min_mix_offset_block_size=0
+
+# generated price offsets
+negative_mix_price_offset=-10
+positive_mix_price_offset=10
+
+# how much seeds to save from RANDOM org, will be used to generate offset arrays
+true_seed_block_size=100
+
+# delay between two ticks
+mix_price_delay=7500
+
+# RANDOM ORG specific settings
+# this will be sent to RANDOM
+user_agent=v-kurse.com
+service_provider_host=https://www.random.org/integers/
+service_provider_quota=https://www.random.org/quota/
+

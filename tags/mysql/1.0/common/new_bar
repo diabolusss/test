@@ -1,0 +1,72 @@
+BEGIN
+
+
+  DECLARE dMax         DOUBLE;
+  DECLARE dMin         DOUBLE;
+  DECLARE dOpen        DOUBLE;
+  DECLARE dClose       DOUBLE;
+  DECLARE vError       VARCHAR (200);
+  DECLARE vDebug       VARCHAR (100);
+  DECLARE dtLastPeriod DATETIME;
+  DECLARE iMP          INT;
+  DECLARE vTable       VARCHAR (50);
+  DECLARE vSQL         VARCHAR (200);
+
+  SET vTable = CONCAT("bars_", iPeriod);
+
+  SET iMP = -1 * iPeriod;
+  SET dtLastPeriod = DATE_ADD(NOW(), INTERVAL iMP MINUTE);
+  SET vError = "SELECT MAX(`hi`) FROM `bars` WHERE ...";
+  SET dMax = (SELECT
+    MAX(`hi`)
+  FROM
+    `bars`
+  WHERE
+    `timestamp` > dtLastPeriod AND `timestamp` < NOW());
+
+  SET vError = "SELECT MIN(`low`) FROM `bars` WHERE ...";
+  SET dMin = (SELECT
+    MIN(`low`)
+  FROM
+    `bars`
+  WHERE
+    `timestamp` > dtLastPeriod AND `timestamp` < NOW());
+
+  SET vError = "SELECT `open` FROM `bars` WHERE `id` = ...";
+  SET dOpen = (SELECT
+    `open`
+  FROM
+    `bars`
+  WHERE
+    `id` = (SELECT
+      MIN(`id`)
+    FROM
+      `bars`
+    WHERE
+      `timestamp` > dtLastPeriod AND `timestamp` < NOW()));
+
+  SET vError = "SELECT `close` FROM `bars` WHERE `id` = ...";
+  SET dClose = (SELECT
+    `close`
+  FROM
+    `bars`
+  WHERE
+    `id` = (SELECT
+      MAX(`id`)
+    FROM
+      `bars`
+    WHERE
+      `timestamp` > dtLastPeriod AND `timestamp` < NOW()));
+
+
+
+  IF ((NOT dMax IS NULL) AND (NOT dMin IS NULL) AND (NOT dOpen IS NULL) AND (NOT dClose IS NULL)) THEN
+    SET vError = "INSERT INTO `bars` (`id`, `hi`, `low`, ...";
+    SET @archive_query := CONCAT("INSERT INTO ", vTable, " (`id`, `hi`, `low`, `open`, `close`, `timestamp`) VALUES (NULL, ", dMax, ", ", dMin, ", ", dOpen, ", ", dClose, ", '", NOW(), "')");
+    PREPARE archive_query FROM @archive_query;
+    EXECUTE archive_query;
+    DEALLOCATE PREPARE archive_query;
+  END IF;
+
+
+END

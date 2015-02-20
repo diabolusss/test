@@ -1,0 +1,11 @@
+K 10
+svn:ignore
+V 11
+build
+dist
+
+K 13
+svn:mergeinfo
+V 30
+/tags/java/FixClient/2.0:53-60
+END
